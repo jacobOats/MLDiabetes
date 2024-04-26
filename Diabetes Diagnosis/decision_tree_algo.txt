@@ -1,0 +1,151 @@
+import numpy as np
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier # Import Decision Tree Classifier
+from sklearn.model_selection import train_test_split # Import train_test_split function
+from sklearn import metrics #Import scikit-learn metrics module for accuracy calculation
+from google.colab import drive
+from sklearn.model_selection import cross_val_score #import cross validation
+import matplotlib.pyplot as plt
+drive.mount('/content/gdrive')
+
+//mounted at ('/content/gdrive)
+
+data = np.loadtxt('/content/gdrive/Shareddrives/COSC667/diabetes.csv', delimiter=',', skiprows=1)
+y = data[:,8]
+
+X = np.array([np.digitize(data[:,0], bins=[1,4]), # Pregnancies, create the following classes: None, Few (1-3), Many (>=4)
+                            np.digitize(data[:,1], bins=[70,130]), # Plasma Glucose, create the following classes: Low (<70), Normal(70-130), High(>=131)
+                            np.digitize(data[:,2], bins=[70,90]), # Diastolic, create the following classes: Low (<70), Normal (71-90), High (>91)
+                            np.digitize(data[:,5], bins=[20,28]), # BMI create the following classes: Low (<20), 6Normal (20-28), High (>28)
+                            np.digitize(data[:,3], bins=[30])]).transpose() # Tricep Skin Fold create the following classes: Low (under 30) and High (over 30)
+X
+
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+
+# Split dataset into training set and test set
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1) # 70% training and 30% test
+# Create Decision Tree classifer object
+clf = DecisionTreeClassifier(criterion="entropy", max_depth=2)
+
+# Train Decision Tree Classifer
+clf = clf.fit(X_train,y_train)
+
+y_pred_train = clf.predict(X_train);
+#Predict the response for test dataset
+y_pred = clf.predict(X_test)
+
+# Model Accuracy
+print("Train Accuracy:",metrics.accuracy_score(y_train, y_pred_train))
+
+from sklearn import linear_model
+from sklearn.svm import l1_min_c
+
+cs = l1_min_c(X_train,y_train, loss="log") * np.logspace(0, 7, 16)
+
+clf = linear_model.LogisticRegression(
+    penalty="l2",
+    solver="liblinear",
+    tol=1e-6,
+    max_iter=int(1e6),
+    warm_start=True,
+    intercept_scaling=10000.0,
+)
+coefs_ = []
+for c in cs:
+    clf.set_params(C=c)
+    clf.fit(X_train,y_train)
+    coefs_.append(clf.coef_.ravel().copy())
+
+coefs_ = np.array(coefs_)
+y_pred_train = clf.predict(X_train);
+#Predict the response for test dataset
+y_pred = clf.predict(X_test)
+print("Train Accuracy after l2 regularization:",metrics.accuracy_score(y_train, y_pred_train))
+
+reg = linear_model.Ridge(alpha=.7)
+reg.fit(X_train,y_train)
+
+# y_pred_train = reg.predict(X_train);
+# #Predict the response for test dataset
+# y_pred = reg.predict(X_test)
+
+
+rsq=reg.score(X_train,y_train)
+print(rsq)
+
+
+//
+
+
+
+from sklearn import metrics
+confusion_matrix = metrics.confusion_matrix(y_test,y_pred)
+cm_display = metrics.ConfusionMatrixDisplay(confusion_matrix = confusion_matrix, display_labels = ["Diabetes", "No Diabetes"])
+cm_display.plot()
+
+# Model Accuracy
+print("Accuracy:",metrics.accuracy_score(y_test, y_pred))
+
+
+
+#5-fold cross validation for finding optimal tree depth
+def run_cross_validation_on_trees(X, y, tree_depths, cv=5, scoring='accuracy'):
+    cv_scores_list = []
+    cv_scores_std = []
+    cv_scores_mean = []
+    accuracy_scores = []
+    for depth in tree_depths:
+        tree_model = DecisionTreeClassifier(max_depth=depth)
+        cv_scores = cross_val_score(tree_model, X, y, cv=cv, scoring=scoring)
+        cv_scores_list.append(cv_scores)
+        cv_scores_mean.append(cv_scores.mean())
+        cv_scores_std.append(cv_scores.std())
+        accuracy_scores.append(tree_model.fit(X, y).score(X, y))
+    cv_scores_mean = np.array(cv_scores_mean)
+    cv_scores_std = np.array(cv_scores_std)
+    accuracy_scores = np.array(accuracy_scores)
+    return cv_scores_mean, cv_scores_std, accuracy_scores
+
+def plot_cross_validation_on_trees(depths, cv_scores_mean, cv_scores_std, accuracy_scores, title):
+    fig, ax = plt.subplots(1,1, figsize=(15,5))
+    ax.plot(depths, cv_scores_mean, '-o', label='mean cross-validation accuracy', alpha=0.9)
+    ax.fill_between(depths, cv_scores_mean-2*cv_scores_std, cv_scores_mean+2*cv_scores_std, alpha=0.2)
+    ylim = plt.ylim()
+    ax.plot(depths, accuracy_scores, '-*', label='train accuracy', alpha=0.9)
+    ax.set_title(title, fontsize=16)
+    ax.set_xlabel('Tree depth', fontsize=14)
+    ax.set_ylabel('Accuracy', fontsize=14)
+    ax.set_ylim(ylim)
+    ax.set_xticks(depths)
+    ax.legend()
+
+# fitting trees of depth 1 to 10
+sm_tree_depths = range(1,10)
+sm_cv_scores_mean, sm_cv_scores_std, sm_accuracy_scores = run_cross_validation_on_trees(X_train, y_train, sm_tree_depths)
+
+# plotting accuracy
+plot_cross_validation_on_trees(sm_tree_depths, sm_cv_scores_mean, sm_cv_scores_std, sm_accuracy_scores, 
+                               'Accuracy per decision tree depth on training data')
+#printing the Accuracy
+idx_max = sm_cv_scores_mean.argmax()
+sm_best_tree_depth = sm_tree_depths[idx_max]
+sm_best_tree_cv_score = sm_cv_scores_mean[idx_max]
+sm_best_tree_cv_score_std = sm_cv_scores_std[idx_max]
+
+
+
+//
+
+
+print('The depth-{} tree achieves the best mean cross-validation accuracy of:{} on training dataset'.format(
+      sm_best_tree_depth, round(sm_best_tree_cv_score*100,5)))
+
+
+
+
+
+
+
